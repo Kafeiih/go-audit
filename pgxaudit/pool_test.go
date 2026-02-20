@@ -28,7 +28,7 @@ func TestAuditPool_ExecBranching_NoInfo(t *testing.T) {
 func TestAuditPool_ExecBranching_WithSkip(t *testing.T) {
 	// When skip is set, Exec should pass through even with info present.
 	ctx := context.Background()
-	ctx = audit.WithInfo(ctx, audit.Info{UserID: "u1", Resource: "test"})
+	ctx = audit.WithInfo(ctx, audit.Info{UserID: "u1", CorrelationID: "corr-skip", Resource: "test"})
 	ctx = audit.WithSkipAudit(ctx)
 
 	if !audit.ShouldSkip(ctx) {
@@ -43,12 +43,13 @@ func TestAuditPool_ExecBranching_WithInfo(t *testing.T) {
 	// transaction with SET LOCAL calls.
 	ctx := context.Background()
 	ctx = audit.WithInfo(ctx, audit.Info{
-		UserID:     "u1",
-		Username:   "alice",
-		Resource:   "orders",
-		ResourceID: "ord-1",
-		IP:         "10.0.0.1",
-		UserAgent:  "TestAgent/1.0",
+		UserID:        "u1",
+		Username:      "alice",
+		CorrelationID: "corr-1",
+		Resource:      "orders",
+		ResourceID:    "ord-1",
+		IP:            "10.0.0.1",
+		UserAgent:     "TestAgent/1.0",
 	})
 
 	info := audit.InfoFrom(ctx)
@@ -65,6 +66,9 @@ func TestAuditPool_ExecBranching_WithInfo(t *testing.T) {
 	}
 	if info.Username != "alice" {
 		t.Errorf("Username = %q, want %q", info.Username, "alice")
+	}
+	if info.CorrelationID != "corr-1" {
+		t.Errorf("CorrelationID = %q, want %q", info.CorrelationID, "corr-1")
 	}
 	if info.Resource != "orders" {
 		t.Errorf("Resource = %q, want %q", info.Resource, "orders")

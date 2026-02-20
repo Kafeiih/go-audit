@@ -35,14 +35,15 @@ type UserExtractor func(context.Context) *UserInfo
 
 // auditJob holds the captured data needed to write a single audit entry.
 type auditJob struct {
-	userID     string
-	username   string
-	action     audit.Action
-	resource   string
-	resourceID string
-	ip         string
-	userAgent  string
-	details    map[string]any
+	userID        string
+	username      string
+	correlationID string
+	action        audit.Action
+	resource      string
+	resourceID    string
+	ip            string
+	userAgent     string
+	details       map[string]any
 }
 
 // AuditMiddleware records an audit log entry for every authenticated request.
@@ -83,7 +84,7 @@ func (m *AuditMiddleware) worker() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
 		entry, err := audit.NewAuditLog(
-			job.userID, job.username,
+			job.userID, job.username, job.correlationID,
 			job.action,
 			job.resource, job.resourceID,
 			job.ip, job.userAgent,
@@ -139,13 +140,14 @@ func (m *AuditMiddleware) Handler() func(http.Handler) http.Handler {
 			}
 
 			job := auditJob{
-				userID:     user.UserID,
-				username:   user.Username,
-				action:     MethodToAction(r.Method),
-				resource:   resource,
-				resourceID: resourceID,
-				ip:         ExtractIP(r.RemoteAddr),
-				userAgent:  r.UserAgent(),
+				userID:        user.UserID,
+				username:      user.Username,
+				correlationID: ExtractCorrelationID(r),
+				action:        MethodToAction(r.Method),
+				resource:      resource,
+				resourceID:    resourceID,
+				ip:            ExtractIP(r.RemoteAddr),
+				userAgent:     r.UserAgent(),
 				details: map[string]any{
 					"status_code": status,
 					"method":      r.Method,
@@ -207,6 +209,21 @@ func ExtractResource(r *http.Request) (resource, resourceID string) {
 	resource = strings.Join(clean, "/")
 
 	return resource, resourceID
+}
+
+// ExtractCorrelationID returns request correlation id from common headers.
+func ExtractCorrelationID(r *http.Request) string {
+	if v := r.Header.Get("X-Correlation-ID"); v != "" {
+		return v
+	}
+	if v := r.Header.Get("X-Request-ID"); v != "" {
+		return v
+	}
+	if v := r.Header.Get("X-Request-Id"); v != "" {
+		return v
+	}
+
+	return ""
 }
 
 // ExtractIP strips the port from a host:port address.

@@ -27,11 +27,20 @@ func (r *PostgresRepo) Create(ctx context.Context, b *audit.AuditLog) error {
 		return fmt.Errorf("serializing details: %w", err)
 	}
 
+	changedFields := b.ChangedFields
+	if changedFields == nil {
+		changedFields = map[string]any{}
+	}
+	changedFieldsJSON, err := json.Marshal(changedFields)
+	if err != nil {
+		return fmt.Errorf("serializing changed_fields: %w", err)
+	}
+
 	_, err = r.pool.Exec(ctx,
-		`INSERT INTO audit.audit_logentry (id, user_id, username, action, resource, resource_id, ip, user_agent, details, created_at)
-		 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		b.ID, b.UserID, b.Username, string(b.Action), b.Resource, b.ResourceID,
-		b.IP, b.UserAgent, detailsJSON, b.CreatedAt,
+		`INSERT INTO audit.audit_logentry (id, user_id, username, correlation_id, action, resource, resource_id, ip, user_agent, details, changed_fields, created_at)
+		 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+		b.ID, b.UserID, b.Username, b.CorrelationID, string(b.Action), b.Resource, b.ResourceID,
+		b.IP, b.UserAgent, detailsJSON, changedFieldsJSON, b.CreatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("inserting audit log entry: %w", err)
@@ -42,7 +51,7 @@ func (r *PostgresRepo) Create(ctx context.Context, b *audit.AuditLog) error {
 
 func (r *PostgresRepo) GetByID(ctx context.Context, id uuid.UUID) (*audit.AuditLog, error) {
 	row := r.pool.QueryRow(ctx,
-		`SELECT id, user_id, username, action, resource, resource_id, ip, user_agent, details, created_at
+		`SELECT id, user_id, username, correlation_id, action, resource, resource_id, ip, user_agent, details, changed_fields, created_at
 		 	FROM audit.audit_logentry WHERE id = $1`, id,
 	)
 
@@ -56,17 +65,18 @@ func (r *PostgresRepo) GetByID(ctx context.Context, id uuid.UUID) (*audit.AuditL
 
 func (r *PostgresRepo) List(ctx context.Context, f audit.AuditFilters) ([]audit.AuditLog, int, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT id, user_id, username, action, resource, resource_id, ip, user_agent, details, created_at,
+		`SELECT id, user_id, username, correlation_id, action, resource, resource_id, ip, user_agent, details, changed_fields, created_at,
 				count(*) OVER()::INT AS total
 			FROM audit.audit_logentry
 			WHERE ($1::TEXT IS NULL OR user_id  = $1)
-				AND ($2::TEXT IS NULL OR resource = $2)
-				AND ($3::TEXT IS NULL OR action   = $3)
-				AND ($4::TIMESTAMPTZ IS NULL OR created_at >= $4)
-				AND ($5::TIMESTAMPTZ IS NULL OR created_at <= $5)
+				AND ($2::TEXT IS NULL OR correlation_id = $2)
+				AND ($3::TEXT IS NULL OR resource = $3)
+				AND ($4::TEXT IS NULL OR action   = $4)
+				AND ($5::TIMESTAMPTZ IS NULL OR created_at >= $5)
+				AND ($6::TIMESTAMPTZ IS NULL OR created_at <= $6)
 			ORDER BY created_at DESC
-			LIMIT $6 OFFSET $7`,
-		nullString(f.UserID), nullString(f.Resource), nullString(string(f.Action)),
+			LIMIT $7 OFFSET $8`,
+		nullString(f.UserID), nullString(f.CorrelationID), nullString(f.Resource), nullString(string(f.Action)),
 		f.From, f.To,
 		f.Limit, f.Offset,
 	)
@@ -100,11 +110,12 @@ func scanAuditLogWithTotal(s scanner, total *int) (*audit.AuditLog, error) {
 	var b audit.AuditLog
 	var action string
 	var detailsJSON []byte
+	var changedFieldsJSON []byte
 
 	err := s.Scan(
-		&b.ID, &b.UserID, &b.Username, &action,
+		&b.ID, &b.UserID, &b.Username, &b.CorrelationID, &action,
 		&b.Resource, &b.ResourceID, &b.IP, &b.UserAgent,
-		&detailsJSON, &b.CreatedAt, total,
+		&detailsJSON, &changedFieldsJSON, &b.CreatedAt, total,
 	)
 	if err != nil {
 		return nil, err
@@ -113,6 +124,9 @@ func scanAuditLogWithTotal(s scanner, total *int) (*audit.AuditLog, error) {
 	b.Action = audit.Action(action)
 	if err := json.Unmarshal(detailsJSON, &b.Details); err != nil {
 		return nil, fmt.Errorf("deserializing details: %w", err)
+	}
+	if err := json.Unmarshal(changedFieldsJSON, &b.ChangedFields); err != nil {
+		return nil, fmt.Errorf("deserializing changed_fields: %w", err)
 	}
 
 	return &b, nil
@@ -122,11 +136,12 @@ func scanAuditLog(s scanner) (*audit.AuditLog, error) {
 	var b audit.AuditLog
 	var action string
 	var detailsJSON []byte
+	var changedFieldsJSON []byte
 
 	err := s.Scan(
-		&b.ID, &b.UserID, &b.Username, &action,
+		&b.ID, &b.UserID, &b.Username, &b.CorrelationID, &action,
 		&b.Resource, &b.ResourceID, &b.IP, &b.UserAgent,
-		&detailsJSON, &b.CreatedAt,
+		&detailsJSON, &changedFieldsJSON, &b.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -135,6 +150,9 @@ func scanAuditLog(s scanner) (*audit.AuditLog, error) {
 	b.Action = audit.Action(action)
 	if err := json.Unmarshal(detailsJSON, &b.Details); err != nil {
 		return nil, fmt.Errorf("deserializing details: %w", err)
+	}
+	if err := json.Unmarshal(changedFieldsJSON, &b.ChangedFields); err != nil {
+		return nil, fmt.Errorf("deserializing changed_fields: %w", err)
 	}
 
 	return &b, nil

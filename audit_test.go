@@ -10,7 +10,7 @@ import (
 
 func TestNewAuditLog_Valid(t *testing.T) {
 	entry, err := audit.NewAuditLog(
-		"user-1", "john",
+		"user-1", "john", "",
 		audit.ActionCreate,
 		"payments", "pay-123",
 		"127.0.0.1", "TestAgent/1.0",
@@ -31,28 +31,28 @@ func TestNewAuditLog_Valid(t *testing.T) {
 }
 
 func TestNewAuditLog_RequiresUserID(t *testing.T) {
-	_, err := audit.NewAuditLog("", "john", audit.ActionRead, "payments", "", "", "", nil)
+	_, err := audit.NewAuditLog("", "john", "", audit.ActionRead, "payments", "", "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for empty user_id")
 	}
 }
 
 func TestNewAuditLog_RequiresValidAction(t *testing.T) {
-	_, err := audit.NewAuditLog("user-1", "john", audit.Action("INVALID"), "payments", "", "", "", nil)
+	_, err := audit.NewAuditLog("user-1", "john", "", audit.Action("INVALID"), "payments", "", "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for invalid action")
 	}
 }
 
 func TestNewAuditLog_RequiresResource(t *testing.T) {
-	_, err := audit.NewAuditLog("user-1", "john", audit.ActionRead, "", "", "", "", nil)
+	_, err := audit.NewAuditLog("user-1", "john", "", audit.ActionRead, "", "", "", "", nil)
 	if err == nil {
 		t.Fatal("expected error for empty resource")
 	}
 }
 
 func TestNewAuditLog_NilDetailsBecomesEmptyMap(t *testing.T) {
-	entry, err := audit.NewAuditLog("user-1", "john", audit.ActionRead, "payments", "", "", "", nil)
+	entry, err := audit.NewAuditLog("user-1", "john", "", audit.ActionRead, "payments", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestNewAuditLog_NilDetailsBecomesEmptyMap(t *testing.T) {
 func TestNewAuditLog_CustomClock(t *testing.T) {
 	fixed := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	entry, err := audit.NewAuditLog(
-		"user-1", "john", audit.ActionRead, "payments", "", "", "", nil,
+		"user-1", "john", "corr-1", audit.ActionRead, "payments", "", "", "", nil,
 		func() time.Time { return fixed },
 	)
 	if err != nil {
@@ -96,7 +96,7 @@ func TestContextPropagation(t *testing.T) {
 	}
 
 	// Attach info
-	info := audit.Info{UserID: "u1", Username: "alice", Resource: "test"}
+	info := audit.Info{UserID: "u1", Username: "alice", CorrelationID: "corr-1", Resource: "test"}
 	ctx = audit.WithInfo(ctx, info)
 	got := audit.InfoFrom(ctx)
 	if got == nil {
@@ -104,6 +104,9 @@ func TestContextPropagation(t *testing.T) {
 	}
 	if got.UserID != "u1" {
 		t.Errorf("expected UserID=u1, got %s", got.UserID)
+	}
+	if got.CorrelationID != "corr-1" {
+		t.Errorf("expected CorrelationID=corr-1, got %s", got.CorrelationID)
 	}
 
 	// Skip audit

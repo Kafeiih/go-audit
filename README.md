@@ -10,7 +10,7 @@ go get github.com/kafeiih/go-audit
 
 ## Features
 
-- **Immutable audit entries** with UUID, timestamps, user info, and arbitrary JSON details
+- **Immutable audit entries** with UUID, timestamps, user info, correlation ID, and arbitrary JSON details
 - **Context propagation** — attach and retrieve audit metadata (`Info`) across the request lifecycle
 - **Skip mechanism** — mark contexts to bypass audit (e.g. bulk imports)
 - **Chi middleware** with a fixed-size worker pool for non-blocking, async persistence
@@ -70,6 +70,7 @@ func main() {
 ctx = audit.WithInfo(ctx, audit.Info{
     UserID:     "user-123",
     Username:   "oscar",
+    CorrelationID: "corr-789",
     Resource:   "orders",
     ResourceID: "ord-456",
     IP:         "192.168.1.1",
@@ -84,7 +85,7 @@ ctx = audit.WithSkipAudit(ctx)
 
 ```go
 entry, err := audit.NewAuditLog(
-    "user-123", "oscar",
+    "user-123", "oscar", "corr-789",
     audit.ActionCreate,
     "orders", "ord-456",
     "192.168.1.1", "MyApp/1.0",
@@ -138,16 +139,20 @@ Notes:
 CREATE SCHEMA IF NOT EXISTS audit;
 
 CREATE TABLE audit.audit_logentry (
-    id          UUID PRIMARY KEY,
-    user_id     TEXT NOT NULL,
-    username    TEXT,
-    action      TEXT NOT NULL,
-    resource    TEXT NOT NULL,
-    resource_id TEXT,
-    ip          TEXT,
-    user_agent  TEXT,
-    details     JSONB DEFAULT '{}',
-    created_at  TIMESTAMPTZ NOT NULL
+    id             UUID PRIMARY KEY,
+    user_id        TEXT NOT NULL DEFAULT '',
+    username       TEXT NOT NULL DEFAULT '',
+    correlation_id TEXT,
+    action         TEXT NOT NULL,
+    resource       TEXT NOT NULL DEFAULT '',
+    resource_id    TEXT NOT NULL DEFAULT '',
+    ip             TEXT NOT NULL DEFAULT '',
+    user_agent     TEXT NOT NULL DEFAULT '',
+    details        JSONB DEFAULT '{}',
+
+    changed_fields JSONB DEFAULT '{}',
+
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- Optional queue table for durable retries (outbox pattern)
@@ -176,7 +181,7 @@ type AuditRepository interface {
 }
 ```
 
-`AuditFilters` supports filtering by `UserID`, `Resource`, `Action`, time range (`From`/`To`), and pagination (`Limit`/`Offset`).
+`AuditFilters` supports filtering by `UserID`, `CorrelationID`, `Resource`, `Action`, time range (`From`/`To`), and pagination (`Limit`/`Offset`).
 
 ## Middleware Behavior
 

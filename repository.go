@@ -9,13 +9,14 @@ import (
 
 // AuditFilters defines the search criteria for listing audit log entries.
 type AuditFilters struct {
-	UserID   string
-	Resource string
-	Action   Action
-	From     *time.Time
-	To       *time.Time
-	Limit    int
-	Offset   int
+	UserID        string
+	CorrelationID string
+	Resource      string
+	Action        Action
+	From          *time.Time
+	To            *time.Time
+	Limit         int
+	Offset        int
 }
 
 // AuditRepository defines the contract for audit log persistence.

@@ -1,16 +1,20 @@
 CREATE SCHEMA IF NOT EXISTS audit;
 
 CREATE TABLE IF NOT EXISTS audit.audit_logentry (
-    id          UUID PRIMARY KEY,
-    user_id     TEXT NOT NULL,
-    username    TEXT,
-    action      TEXT NOT NULL,
-    resource    TEXT NOT NULL,
-    resource_id TEXT,
-    ip          TEXT,
-    user_agent  TEXT,
-    details     JSONB DEFAULT '{}',
-    created_at  TIMESTAMPTZ NOT NULL
+    id             UUID PRIMARY KEY,
+    user_id        TEXT NOT NULL DEFAULT '',
+    username       TEXT NOT NULL DEFAULT '',
+    correlation_id TEXT,
+    action         TEXT NOT NULL,
+    resource       TEXT NOT NULL DEFAULT '',
+    resource_id    TEXT NOT NULL DEFAULT '',
+    ip             TEXT NOT NULL DEFAULT '',
+    user_agent     TEXT NOT NULL DEFAULT '',
+    details        JSONB DEFAULT '{}',
+
+    changed_fields JSONB DEFAULT '{}',
+
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS audit.audit_outbox (
