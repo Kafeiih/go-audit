@@ -129,8 +129,16 @@ You can copy them into your host project migrations folder with:
 go run github.com/kafeiih/go-audit/cmd/go-audit-migrations@v0.5.2 -out ./migrations
 ```
 
+If you use [Goose](https://github.com/pressly/goose), you can generate Goose-compatible files (`-- +goose Up/Down`) with:
+
+```bash
+go run github.com/kafeiih/go-audit/cmd/go-audit-migrations@v0.5.2 -out ./migrations -format goose
+```
+
 Notes:
 - The command only copies files; your host project decides when/how to execute them.
+- `-format split` (default) writes `*.up.sql` + `*.down.sql` files.
+- `-format goose` writes single `*.sql` Goose files.
 - It fails if destination files already exist, to prevent accidental overwrites.
 
 ## Database Schema
