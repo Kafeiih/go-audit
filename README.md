@@ -118,10 +118,26 @@ audit (core)
         • Enables database-level audit triggers
 ```
 
+## Migrations
+
+This package ships embedded SQL migrations for PostgreSQL (`audit` schema, `audit_logentry`, and `audit_outbox`).
+
+You can copy them into your host project migrations folder with:
+
+```bash
+go run github.com/kafeiih/go-audit/cmd/go-audit-migrations@v0.5.2 -out ./migrations
+```
+
+Notes:
+- The command only copies files; your host project decides when/how to execute them.
+- It fails if destination files already exist, to prevent accidental overwrites.
+
 ## Database Schema
 
 ```sql
-CREATE TABLE audit_log (
+CREATE SCHEMA IF NOT EXISTS audit;
+
+CREATE TABLE audit.audit_logentry (
     id          UUID PRIMARY KEY,
     user_id     TEXT NOT NULL,
     username    TEXT,
@@ -133,7 +149,20 @@ CREATE TABLE audit_log (
     details     JSONB DEFAULT '{}',
     created_at  TIMESTAMPTZ NOT NULL
 );
+
+-- Optional queue table for durable retries (outbox pattern)
+CREATE TABLE audit.audit_outbox (
+    id            BIGSERIAL PRIMARY KEY,
+    event_id      UUID NOT NULL,
+    payload       JSONB NOT NULL,
+    attempts      INT NOT NULL DEFAULT 0,
+    next_retry_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    processed_at  TIMESTAMPTZ,
+    last_error    TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ```
+
 
 ## Repository Interface
 
