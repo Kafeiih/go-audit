@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 )
@@ -50,7 +51,7 @@ func CopyMigrations(dstDir string) error {
 			return fmt.Errorf("checking existing migration %s: %w", target, err)
 		}
 
-		content, err := fs.ReadFile(embeddedMigrations, filepath.Join("migrations", name))
+		content, err := fs.ReadFile(embeddedMigrations, path.Join("migrations", name))
 		if err != nil {
 			return fmt.Errorf("reading embedded migration %s: %w", name, err)
 		}
