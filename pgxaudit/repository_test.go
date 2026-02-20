@@ -60,7 +60,7 @@ func TestPostgresRepo_Create_Success(t *testing.T) {
 	repo := NewPostgresRepo(db)
 
 	entry, err := audit.NewAuditLog(
-		"user-1", "alice",
+		"user-1", "alice", "corr-123",
 		audit.ActionCreate,
 		"orders", "ord-1",
 		"10.0.0.1", "TestAgent/1.0",
@@ -79,9 +79,9 @@ func TestPostgresRepo_Create_Success(t *testing.T) {
 		t.Fatal("expected SQL to be captured")
 	}
 
-	// Verify all 10 args were passed.
-	if len(capturedArgs) != 10 {
-		t.Fatalf("expected 10 args, got %d", len(capturedArgs))
+	// Verify all 12 args were passed.
+	if len(capturedArgs) != 12 {
+		t.Fatalf("expected 12 args, got %d", len(capturedArgs))
 	}
 
 	// Verify the ID is passed correctly.
@@ -89,10 +89,13 @@ func TestPostgresRepo_Create_Success(t *testing.T) {
 		t.Errorf("arg[0] (id) = %v, want %v", capturedArgs[0], entry.ID)
 	}
 
+	if capturedArgs[3] != "corr-123" {
+		t.Errorf("arg[3] (correlation_id) = %v, want corr-123", capturedArgs[3])
+	}
 	// Verify details is serialized as JSON bytes.
-	detailsBytes, ok := capturedArgs[8].([]byte)
+	detailsBytes, ok := capturedArgs[9].([]byte)
 	if !ok {
-		t.Fatalf("arg[8] (details) expected []byte, got %T", capturedArgs[8])
+		t.Fatalf("arg[9] (details) expected []byte, got %T", capturedArgs[9])
 	}
 	var details map[string]any
 	if err := json.Unmarshal(detailsBytes, &details); err != nil {
@@ -100,6 +103,17 @@ func TestPostgresRepo_Create_Success(t *testing.T) {
 	}
 	if details["amount"] != 100.5 {
 		t.Errorf("details[amount] = %v, want 100.5", details["amount"])
+	}
+	changedFieldsBytes, ok := capturedArgs[10].([]byte)
+	if !ok {
+		t.Fatalf("arg[10] (changed_fields) expected []byte, got %T", capturedArgs[10])
+	}
+	var changed map[string]any
+	if err := json.Unmarshal(changedFieldsBytes, &changed); err != nil {
+		t.Fatalf("failed to unmarshal changed_fields: %v", err)
+	}
+	if len(changed) != 0 {
+		t.Errorf("expected empty changed_fields by default, got %v", changed)
 	}
 }
 
@@ -113,7 +127,7 @@ func TestPostgresRepo_Create_ExecError(t *testing.T) {
 	repo := NewPostgresRepo(db)
 
 	entry, _ := audit.NewAuditLog(
-		"user-1", "alice", audit.ActionCreate, "orders", "ord-1", "", "", nil,
+		"user-1", "alice", "", audit.ActionCreate, "orders", "ord-1", "", "", nil,
 	)
 
 	err := repo.Create(context.Background(), entry)
@@ -193,38 +207,43 @@ func TestPostgresRepo_List_FiltersPassedCorrectly(t *testing.T) {
 	from := now.Add(-24 * time.Hour)
 
 	repo.List(context.Background(), audit.AuditFilters{
-		UserID:   "user-1",
-		Resource: "orders",
-		Action:   audit.ActionCreate,
-		From:     &from,
-		To:       &now,
-		Limit:    20,
-		Offset:   5,
+		UserID:        "user-1",
+		CorrelationID: "corr-123",
+		Resource:      "orders",
+		Action:        audit.ActionCreate,
+		From:          &from,
+		To:            &now,
+		Limit:         20,
+		Offset:        5,
 	})
 
-	if len(capturedArgs) != 7 {
-		t.Fatalf("expected 7 args, got %d", len(capturedArgs))
+	if len(capturedArgs) != 8 {
+		t.Fatalf("expected 8 args, got %d", len(capturedArgs))
 	}
 
 	// $1 = UserID (as *string)
 	if s := capturedArgs[0].(*string); s == nil || *s != "user-1" {
 		t.Errorf("arg[0] (UserID) = %v, want 'user-1'", capturedArgs[0])
 	}
-	// $2 = Resource
-	if s := capturedArgs[1].(*string); s == nil || *s != "orders" {
-		t.Errorf("arg[1] (Resource) = %v, want 'orders'", capturedArgs[1])
+	// $2 = CorrelationID
+	if s := capturedArgs[1].(*string); s == nil || *s != "corr-123" {
+		t.Errorf("arg[1] (CorrelationID) = %v, want corr-123", capturedArgs[1])
 	}
-	// $3 = Action
-	if s := capturedArgs[2].(*string); s == nil || *s != "CREATE" {
-		t.Errorf("arg[2] (Action) = %v, want 'CREATE'", capturedArgs[2])
+	// $3 = Resource
+	if s := capturedArgs[2].(*string); s == nil || *s != "orders" {
+		t.Errorf("arg[2] (Resource) = %v, want 'orders'", capturedArgs[2])
 	}
-	// $6 = Limit
-	if capturedArgs[5] != 20 {
-		t.Errorf("arg[5] (Limit) = %v, want 20", capturedArgs[5])
+	// $4 = Action
+	if s := capturedArgs[3].(*string); s == nil || *s != "CREATE" {
+		t.Errorf("arg[3] (Action) = %v, want 'CREATE'", capturedArgs[3])
 	}
-	// $7 = Offset
-	if capturedArgs[6] != 5 {
-		t.Errorf("arg[6] (Offset) = %v, want 5", capturedArgs[6])
+	// $7 = Limit
+	if capturedArgs[6] != 20 {
+		t.Errorf("arg[6] (Limit) = %v, want 20", capturedArgs[6])
+	}
+	// $8 = Offset
+	if capturedArgs[7] != 5 {
+		t.Errorf("arg[7] (Offset) = %v, want 5", capturedArgs[7])
 	}
 }
 
@@ -246,10 +265,13 @@ func TestPostgresRepo_List_EmptyFilters(t *testing.T) {
 		t.Errorf("arg[0] (UserID) should be nil for empty filter, got %v", capturedArgs[0])
 	}
 	if capturedArgs[1] != (*string)(nil) {
-		t.Errorf("arg[1] (Resource) should be nil for empty filter, got %v", capturedArgs[1])
+		t.Errorf("arg[1] (CorrelationID) should be nil for empty filter, got %v", capturedArgs[1])
 	}
 	if capturedArgs[2] != (*string)(nil) {
-		t.Errorf("arg[2] (Action) should be nil for empty filter, got %v", capturedArgs[2])
+		t.Errorf("arg[2] (Resource) should be nil for empty filter, got %v", capturedArgs[2])
+	}
+	if capturedArgs[3] != (*string)(nil) {
+		t.Errorf("arg[3] (Action) should be nil for empty filter, got %v", capturedArgs[3])
 	}
 }
 

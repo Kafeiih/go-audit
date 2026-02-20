@@ -58,12 +58,13 @@ func (p *AuditPool) Exec(ctx context.Context, sql string, args ...any) (pgconn.C
 	defer tx.Rollback(ctx)
 
 	configs := map[string]string{
-		"app.user_id":     info.UserID,
-		"app.username":    info.Username,
-		"app.resource":    info.Resource,
-		"app.resource_id": info.ResourceID,
-		"app.ip":          info.IP,
-		"app.user_agent":  info.UserAgent,
+		"app.user_id":        info.UserID,
+		"app.username":       info.Username,
+		"app.correlation_id": info.CorrelationID,
+		"app.resource":       info.Resource,
+		"app.resource_id":    info.ResourceID,
+		"app.ip":             info.IP,
+		"app.user_agent":     info.UserAgent,
 	}
 	for key, val := range configs {
 		if _, err := tx.Exec(ctx, "SELECT set_config($1, $2, true)", key, val); err != nil {

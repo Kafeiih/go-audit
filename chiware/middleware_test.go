@@ -99,11 +99,11 @@ func TestExtractIP(t *testing.T) {
 
 func TestExtractResource(t *testing.T) {
 	tests := []struct {
-		name       string
-		pattern    string
-		url        string
-		wantRes    string
-		wantResID  string
+		name      string
+		pattern   string
+		url       string
+		wantRes   string
+		wantResID string
 	}{
 		{
 			name:      "resource with id",
@@ -181,6 +181,7 @@ func TestHandler_AuditsAuthenticatedRequest(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/orders/ord-1", nil)
 	req.Header.Set("User-Agent", "TestAgent/1.0")
+	req.Header.Set("X-Correlation-ID", "corr-123")
 	req.RemoteAddr = "10.0.0.1:12345"
 	rec := httptest.NewRecorder()
 
@@ -212,6 +213,9 @@ func TestHandler_AuditsAuthenticatedRequest(t *testing.T) {
 	}
 	if e.UserAgent != "TestAgent/1.0" {
 		t.Errorf("UserAgent = %q, want %q", e.UserAgent, "TestAgent/1.0")
+	}
+	if e.CorrelationID != "corr-123" {
+		t.Errorf("CorrelationID = %q, want %q", e.CorrelationID, "corr-123")
 	}
 }
 
@@ -362,5 +366,31 @@ func TestHandler_QueueFullDiscardsEntry(t *testing.T) {
 		// OK — request completed without blocking.
 	case <-time.After(2 * time.Second):
 		t.Fatal("handler blocked on full queue")
+	}
+}
+
+func TestExtractCorrelationID(t *testing.T) {
+	tests := []struct {
+		name    string
+		headers map[string]string
+		want    string
+	}{
+		{name: "x-correlation-id", headers: map[string]string{"X-Correlation-ID": "corr-1"}, want: "corr-1"},
+		{name: "x-request-id", headers: map[string]string{"X-Request-ID": "req-1"}, want: "req-1"},
+		{name: "x-request-id-chi", headers: map[string]string{"X-Request-Id": "req-chi-1"}, want: "req-chi-1"},
+		{name: "none", headers: map[string]string{}, want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/v1/orders", nil)
+			for k, v := range tt.headers {
+				req.Header.Set(k, v)
+			}
+
+			if got := ExtractCorrelationID(req); got != tt.want {
+				t.Errorf("ExtractCorrelationID() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
