@@ -118,6 +118,20 @@ audit (core)
         • Enables database-level audit triggers
 ```
 
+## Migrations
+
+This package ships embedded SQL migrations for PostgreSQL (`audit` schema, `audit_logentry`, and `audit_outbox`).
+
+You can copy them into your host project migrations folder with:
+
+```bash
+go run github.com/kafeiih/go-audit/cmd/go-audit-migrations@v0.5.2 -out ./migrations
+```
+
+Notes:
+- The command only copies files; your host project decides when/how to execute them.
+- It fails if destination files already exist, to prevent accidental overwrites.
+
 ## Database Schema
 
 ```sql
