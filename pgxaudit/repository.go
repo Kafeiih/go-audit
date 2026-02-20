@@ -28,7 +28,7 @@ func (r *PostgresRepo) Create(ctx context.Context, b *audit.AuditLog) error {
 	}
 
 	_, err = r.pool.Exec(ctx,
-		`INSERT INTO audit_log (id, user_id, username, action, resource, resource_id, ip, user_agent, details, created_at)
+		`INSERT INTO audit.audit_logentry (id, user_id, username, action, resource, resource_id, ip, user_agent, details, created_at)
 		 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 		b.ID, b.UserID, b.Username, string(b.Action), b.Resource, b.ResourceID,
 		b.IP, b.UserAgent, detailsJSON, b.CreatedAt,
@@ -43,7 +43,7 @@ func (r *PostgresRepo) Create(ctx context.Context, b *audit.AuditLog) error {
 func (r *PostgresRepo) GetByID(ctx context.Context, id uuid.UUID) (*audit.AuditLog, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT id, user_id, username, action, resource, resource_id, ip, user_agent, details, created_at
-		 	FROM audit_log WHERE id = $1`, id,
+		 	FROM audit.audit_logentry WHERE id = $1`, id,
 	)
 
 	b, err := scanAuditLog(row)
@@ -58,7 +58,7 @@ func (r *PostgresRepo) List(ctx context.Context, f audit.AuditFilters) ([]audit.
 	rows, err := r.pool.Query(ctx,
 		`SELECT id, user_id, username, action, resource, resource_id, ip, user_agent, details, created_at,
 				count(*) OVER()::INT AS total
-			FROM audit_log
+			FROM audit.audit_logentry
 			WHERE ($1::TEXT IS NULL OR user_id  = $1)
 				AND ($2::TEXT IS NULL OR resource = $2)
 				AND ($3::TEXT IS NULL OR action   = $3)

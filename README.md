@@ -121,7 +121,9 @@ audit (core)
 ## Database Schema
 
 ```sql
-CREATE TABLE audit_log (
+CREATE SCHEMA IF NOT EXISTS audit;
+
+CREATE TABLE audit.audit_logentry (
     id          UUID PRIMARY KEY,
     user_id     TEXT NOT NULL,
     username    TEXT,
@@ -133,7 +135,20 @@ CREATE TABLE audit_log (
     details     JSONB DEFAULT '{}',
     created_at  TIMESTAMPTZ NOT NULL
 );
+
+-- Optional queue table for durable retries (outbox pattern)
+CREATE TABLE audit.audit_outbox (
+    id            BIGSERIAL PRIMARY KEY,
+    event_id      UUID NOT NULL,
+    payload       JSONB NOT NULL,
+    attempts      INT NOT NULL DEFAULT 0,
+    next_retry_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    processed_at  TIMESTAMPTZ,
+    last_error    TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ```
+
 
 ## Repository Interface
 
