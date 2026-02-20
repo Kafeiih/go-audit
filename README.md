@@ -126,11 +126,20 @@ This package ships embedded SQL migrations for PostgreSQL (`audit` schema, `audi
 You can copy them into your host project migrations folder with:
 
 ```bash
-go run github.com/kafeiih/go-audit/cmd/go-audit-migrations@v0.5.2 -out ./migrations
+go run github.com/kafeiih/go-audit/cmd/go-audit-migrations@latest -out ./migrations
+```
+
+If you use [Goose](https://github.com/pressly/goose), you can generate Goose-compatible files (`-- +goose Up/Down`) with:
+
+```bash
+go run github.com/kafeiih/go-audit/cmd/go-audit-migrations@latest -out ./migrations -goose
 ```
 
 Notes:
 - The command only copies files; your host project decides when/how to execute them.
+- `-format split` (default) writes `*.up.sql` + `*.down.sql` files.
+- `-format goose` (or `-goose`) writes single `*.sql` Goose files.
+- If you get `flag provided but not defined: -format` or `-goose`, you are running an older module version that predates Goose support. Use a newer tag or `@latest`.
 - It fails if destination files already exist, to prevent accidental overwrites.
 
 ## Database Schema

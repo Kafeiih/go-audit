@@ -3,6 +3,7 @@ package pgxaudit
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -36,5 +37,30 @@ func TestCopyMigrations(t *testing.T) {
 
 	if err := CopyMigrations(dir); err == nil {
 		t.Fatal("expected error when copying on top of existing files")
+	}
+}
+
+func TestCopyGooseMigrations(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := CopyGooseMigrations(dir); err != nil {
+		t.Fatalf("CopyGooseMigrations returned error: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, "000001_create_audit_schema.sql"))
+	if err != nil {
+		t.Fatalf("expected goose migration file: %v", err)
+	}
+
+	text := string(content)
+	if !strings.Contains(text, "-- +goose Up") {
+		t.Fatal("expected goose Up marker")
+	}
+	if !strings.Contains(text, "-- +goose Down") {
+		t.Fatal("expected goose Down marker")
+	}
+
+	if err := CopyGooseMigrations(dir); err == nil {
+		t.Fatal("expected error when copying on top of existing goose files")
 	}
 }
