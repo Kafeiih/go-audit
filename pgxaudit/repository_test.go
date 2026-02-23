@@ -43,6 +43,10 @@ func (m *mockDB) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row 
 	return nil
 }
 
+func (m *mockDB) Begin(_ context.Context) (pgx.Tx, error) {
+	return nil, errors.New("mockDB: Begin not implemented")
+}
+
 // ---------- Create ----------
 
 func TestPostgresRepo_Create_Success(t *testing.T) {
