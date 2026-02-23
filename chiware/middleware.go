@@ -211,7 +211,8 @@ func ExtractResource(r *http.Request) (resource, resourceID string) {
 	return resource, resourceID
 }
 
-// ExtractCorrelationID returns request correlation id from common headers.
+// ExtractCorrelationID returns request correlation id from common headers,
+// falling back to chi's RequestID middleware context value.
 func ExtractCorrelationID(r *http.Request) string {
 	if v := r.Header.Get("X-Correlation-ID"); v != "" {
 		return v
@@ -222,7 +223,9 @@ func ExtractCorrelationID(r *http.Request) string {
 	if v := r.Header.Get("X-Request-Id"); v != "" {
 		return v
 	}
-
+	if v := chiMiddleware.GetReqID(r.Context()); v != "" {
+		return v
+	}
 	return ""
 }
 
